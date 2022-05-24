@@ -32,30 +32,16 @@ public class SocketConnection implements Connection {
 
         signalQueue.add(MetaSignal.SERVERNAME.toSignal());
 
-        listeners.add((signal) -> {
-            if (signal.getSerializable() instanceof MetaSignal) {
-                MetaSignal metaSignal = (MetaSignal) signal.getSerializable();
-                switch (metaSignal) {
-                    case SERVERNAME:
-                        signalQueue.add(metaSignal.createResponse(name));
-                        break;
-                }
-            } else if (signal.getSerializable() instanceof MetaSignal.MetaResponse) {
-                MetaSignal.MetaResponse metaRes = (MetaSignal.MetaResponse) signal.getSerializable();
-                switch (metaRes.request) {
-                    case SERVERNAME:
-                        if (!(metaRes.response instanceof String)) {
-                            signalQueue.add(MetaSignal.SERVERNAME.toSignal());
-                            break;
-                        }
-                        name = (String) metaRes.response;
-                        break;
-                }
-            }
-        });
+        listeners.add(new DefaultListener());
 
+        inWorker.setDaemon(true);
+        outWorker.setDaemon(true);
         inWorker.start();
         outWorker.start();
+    }
+
+    public SocketConnection(String host, int port, int signalCapacity) throws IOException {
+        this(new Socket(host, port), signalCapacity);
     }
 
     @Override
@@ -156,6 +142,31 @@ public class SocketConnection implements Connection {
 
         public void setCancelled(boolean cancelled) {
             this.cancelled = cancelled;
+        }
+    }
+
+    class DefaultListener implements SignalListener {
+        @Override
+        public void listen(Signal signal) {
+            if (signal.getSerializable() instanceof MetaSignal) {
+                MetaSignal metaSignal = (MetaSignal) signal.getSerializable();
+                switch (metaSignal) {
+                    case SERVERNAME:
+                        signalQueue.add(metaSignal.createResponse(name));
+                        break;
+                }
+            } else if (signal.getSerializable() instanceof MetaSignal.MetaResponse) {
+                MetaSignal.MetaResponse metaRes = (MetaSignal.MetaResponse) signal.getSerializable();
+                switch (metaRes.request) {
+                    case SERVERNAME:
+                        if (!(metaRes.response instanceof String)) {
+                            signalQueue.add(MetaSignal.SERVERNAME.toSignal());
+                            break;
+                        }
+                        name = (String) metaRes.response;
+                        break;
+                }
+            }
         }
     }
 }
