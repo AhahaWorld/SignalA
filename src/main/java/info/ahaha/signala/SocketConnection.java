@@ -24,11 +24,16 @@ public class SocketConnection implements Connection {
     protected Map<String, Channel> channels = new HashMap<>();
     protected List<SignalListener> listeners = new ArrayList<>();
 
+    protected ObjectInputStream in;
+    protected ObjectOutputStream out;
+
     public SocketConnection(Socket socket, int signalCapacity) throws IOException {
         this.socket = socket;
+        this.in = new ObjectInputStream(socket.getInputStream());
+        this.out = new ObjectOutputStream(socket.getOutputStream());
         this.signalQueue = new ArrayBlockingQueue<>(signalCapacity);
-        this.inWorker = new Thread(new ConnectionInWorker(this));
-        this.outWorker = new Thread(new ConnectionOutWorker(this));
+        this.inWorker = new Thread(new ConnectionInWorker());
+        this.outWorker = new Thread(new ConnectionOutWorker());
 
         signalQueue.add(MetaSignal.SERVERNAME.toSignal());
 
@@ -71,6 +76,30 @@ public class SocketConnection implements Connection {
     }
 
     @Override
+    public void close() {
+        try {
+            socket.close();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        try {
+            out.flush();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        try {
+            out.close();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        try {
+            in.close();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
     public void registerListener(SignalListener signalListener) {
         listeners.add(signalListener);
     }
@@ -90,20 +119,16 @@ public class SocketConnection implements Connection {
     }
 
     public class ConnectionInWorker implements Runnable {
-        ObjectInputStream in;
         boolean cancelled = false;
         SocketConnection parent;
-
-        ConnectionInWorker(SocketConnection connection) throws IOException {
-            this.parent = connection;
-            this.in = new ObjectInputStream(connection.getSocket().getInputStream());
-        }
 
         @Override
         public void run() {
             while (!cancelled)
                 try {
                     Object object = in.readObject();
+                    if (object == null)
+                        continue;
                     if (!(object instanceof Signal))
                         continue;
                     Signal signal = (Signal) object;
@@ -120,14 +145,7 @@ public class SocketConnection implements Connection {
     }
 
     public class ConnectionOutWorker implements Runnable {
-        ObjectOutputStream out;
         boolean cancelled = false;
-        SocketConnection parent;
-
-        ConnectionOutWorker(SocketConnection connection) throws IOException {
-            this.parent = connection;
-            this.out = new ObjectOutputStream(connection.getSocket().getOutputStream());
-        }
 
         @Override
         public void run() {

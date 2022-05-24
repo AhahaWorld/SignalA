@@ -8,4 +8,6 @@ public interface Connection extends SignalRegister {
     Channel getChannel(String name);
 
     void deleteChannel(Channel channel);
+
+    void close();
 }

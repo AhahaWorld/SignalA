@@ -5,13 +5,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class PipeConnection implements Connection{
+public class PipeConnection implements Connection {
     protected String name;
 
     protected Map<String, Channel> channels = new HashMap<>();
     protected List<SignalListener> listeners = new ArrayList<>();
 
-    public PipeConnection(String name){
+    public PipeConnection(String name) {
         this.name = name;
     }
 
@@ -35,6 +35,10 @@ public class PipeConnection implements Connection{
     @Override
     public void deleteChannel(Channel channel) {
         channels.remove(channel.name());
+    }
+
+    @Override
+    public void close() {
     }
 
     @Override
