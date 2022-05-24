@@ -1,7 +1,5 @@
 package info.ahaha.signala;
 
-import com.sun.istack.internal.Nullable;
-
 import java.io.Serializable;
 
 public class Signal implements Serializable {
@@ -32,7 +30,7 @@ public class Signal implements Serializable {
         return serializable;
     }
 
-    public void attach(Connection connection){
+    public void attach(Connection connection) {
         channel = connection.getChannel(channelName);
     }
 
