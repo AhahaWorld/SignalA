@@ -5,8 +5,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Channel implements SignalRegister {
-    public static Channel UNKNOWN = new Channel("unknown", null);
-
     String name;
     Connection connection;
     List<SignalListener> listeners = new ArrayList<>();
@@ -21,7 +19,7 @@ public class Channel implements SignalRegister {
     }
 
     public void sendSignal(String name, Serializable serializable) {
-        connection.sendSignal(new Signal(this, name, serializable));
+        connection.sendSignal(new ChannelSignal(this, name, serializable));
     }
 
     public void registerListener(SignalListener signalListener) {
@@ -32,9 +30,13 @@ public class Channel implements SignalRegister {
         listeners.remove(signalListener);
     }
 
-    public void call(Signal signal) {
+    public void call(Signalable signal) {
         for (SignalListener listener : listeners) {
             listener.listen(signal);
         }
+    }
+
+    public Connection getConnection() {
+        return connection;
     }
 }

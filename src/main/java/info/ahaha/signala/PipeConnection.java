@@ -16,7 +16,7 @@ public class PipeConnection implements Connection {
     }
 
     @Override
-    public void sendSignal(Signal signal) {
+    public void sendSignal(Signalable signal) {
         call(signal);
     }
 
@@ -52,11 +52,11 @@ public class PipeConnection implements Connection {
     }
 
     @Override
-    public void call(Signal signal) {
+    public void call(Signalable signal) {
         for (SignalListener listener : listeners) {
             listener.listen(signal);
         }
-        if (signal.getChannel() != null)
-            signal.getChannel().call(signal);
+        if (signal instanceof ChannelSignal)
+            ((ChannelSignal) signal).getChannel().call(signal);
     }
 }

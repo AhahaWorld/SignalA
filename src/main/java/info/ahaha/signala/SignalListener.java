@@ -1,5 +1,6 @@
 package info.ahaha.signala;
 
+@FunctionalInterface
 public interface SignalListener {
-    void listen(Signal signal);
+    void listen(Signalable signal);
 }

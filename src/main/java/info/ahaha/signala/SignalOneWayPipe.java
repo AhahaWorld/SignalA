@@ -1,5 +1,5 @@
 package info.ahaha.signala;
 
 public interface SignalOneWayPipe {
-    void send(Signal signal);
+    void send(Signalable signal);
 }

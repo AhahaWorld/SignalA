@@ -2,47 +2,42 @@ package info.ahaha.signala;
 
 import java.io.Serializable;
 
-public class Signal implements Serializable {
-    protected transient Channel channel;
-    protected String channelName, signalName;
+public class Signal implements Signalable{
+    transient Connection connection;
+    protected String signalName;
     protected Serializable serializable;
 
-    public Signal(Channel channel, String signalName, Serializable serializable) {
-        this.channel = channel;
-        this.channelName = channel.name();
+    public Signal(String signalName, Serializable serializable) {
         this.signalName = signalName;
         this.serializable = serializable;
     }
 
-    public Channel getChannel() {
-        return channel;
-    }
-
-    public String getChannelName() {
-        return channelName;
-    }
-
+    @Override
     public String getSignalName() {
         return signalName;
     }
 
+    @Override
     public Serializable getSerializable() {
         return serializable;
     }
 
+    @Override
+    public Connection getConnection() {
+        return connection;
+    }
+
+    @Override
     public void attach(Connection connection) {
-        channel = connection.getChannel(channelName);
+        this.connection = connection;
     }
 
-    public void setChannel(Channel channel) {
-        this.channel = channel;
-        this.channelName = channel.name();
-    }
-
+    @Override
     public void setSignalName(String signalName) {
         this.signalName = signalName;
     }
 
+    @Override
     public void setSerializable(Serializable serializable) {
         this.serializable = serializable;
     }

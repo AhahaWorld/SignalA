@@ -5,5 +5,5 @@ public interface SignalRegister {
 
     void unregisterListener(SignalListener signalListener);
 
-    void call(Signal signal);
+    void call(Signalable signal);
 }

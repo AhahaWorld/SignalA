@@ -1,7 +1,7 @@
 package info.ahaha.signala;
 
 public interface Connection extends SignalRegister {
-    void sendSignal(Signal signal);
+    void sendSignal(Signalable signal);
 
     String name();
 

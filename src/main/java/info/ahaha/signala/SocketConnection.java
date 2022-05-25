@@ -15,11 +15,13 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 public class SocketConnection implements Connection {
+    protected final SocketConnection outer;
+
     protected Socket socket;
     protected Thread inWorker, outWorker;
     protected String name;
 
-    protected BlockingQueue<Signal> signalQueue;
+    protected BlockingQueue<Signalable> signalQueue;
 
     protected Map<String, Channel> channels = new HashMap<>();
     protected List<SignalListener> listeners = new ArrayList<>();
@@ -28,9 +30,13 @@ public class SocketConnection implements Connection {
     protected ObjectOutputStream out;
 
     public SocketConnection(Socket socket, int signalCapacity) throws IOException {
+        outer = this;
+
         this.socket = socket;
+        // in -> out
         this.in = new ObjectInputStream(socket.getInputStream());
         this.out = new ObjectOutputStream(socket.getOutputStream());
+
         this.signalQueue = new ArrayBlockingQueue<>(signalCapacity);
         this.inWorker = new Thread(new ConnectionInWorker());
         this.outWorker = new Thread(new ConnectionOutWorker());
@@ -46,11 +52,29 @@ public class SocketConnection implements Connection {
     }
 
     public SocketConnection(String host, int port, int signalCapacity) throws IOException {
-        this(new Socket(host, port), signalCapacity);
+        outer = this;
+
+        this.socket = new Socket(host, port);
+        // out -> in
+        this.out = new ObjectOutputStream(socket.getOutputStream());
+        this.in = new ObjectInputStream(socket.getInputStream());
+
+        this.signalQueue = new ArrayBlockingQueue<>(signalCapacity);
+        this.inWorker = new Thread(new ConnectionInWorker());
+        this.outWorker = new Thread(new ConnectionOutWorker());
+
+        signalQueue.add(MetaSignal.SERVERNAME.toSignal());
+
+        listeners.add(new DefaultListener());
+
+        inWorker.setDaemon(true);
+        outWorker.setDaemon(true);
+        inWorker.start();
+        outWorker.start();
     }
 
     @Override
-    public void sendSignal(Signal signal) {
+    public void sendSignal(Signalable signal) {
         signalQueue.add(signal);
     }
 
@@ -110,17 +134,16 @@ public class SocketConnection implements Connection {
     }
 
     @Override
-    public void call(Signal signal) {
+    public void call(Signalable signal) {
         for (SignalListener listener : listeners) {
             listener.listen(signal);
         }
-        if (signal.getChannel() != null)
-            signal.getChannel().call(signal);
+        if (signal instanceof ChannelSignal)
+            ((ChannelSignal) signal).getChannel().call(signal);
     }
 
     public class ConnectionInWorker implements Runnable {
         boolean cancelled = false;
-        SocketConnection parent;
 
         @Override
         public void run() {
@@ -129,11 +152,11 @@ public class SocketConnection implements Connection {
                     Object object = in.readObject();
                     if (object == null)
                         continue;
-                    if (!(object instanceof Signal))
+                    if (!(object instanceof Signalable))
                         continue;
-                    Signal signal = (Signal) object;
-                    signal.attach(parent);
-                    parent.call(signal);
+                    Signalable signal = (Signalable) object;
+                    signal.attach(outer);
+                    outer.call(signal);
                 } catch (IOException | ClassNotFoundException e) {
                     e.printStackTrace();
                 }
@@ -151,7 +174,7 @@ public class SocketConnection implements Connection {
         public void run() {
             while (!cancelled)
                 try {
-                    Signal signal = signalQueue.poll(10, TimeUnit.SECONDS);
+                    Signalable signal = signalQueue.poll(10, TimeUnit.SECONDS);
                     out.writeObject(signal);
                 } catch (InterruptedException | IOException e) {
                     e.printStackTrace();
@@ -165,12 +188,12 @@ public class SocketConnection implements Connection {
 
     class DefaultListener implements SignalListener {
         @Override
-        public void listen(Signal signal) {
-            if (signal.getSerializable() instanceof MetaSignal) {
-                MetaSignal metaSignal = (MetaSignal) signal.getSerializable();
-                switch (metaSignal) {
+        public void listen(Signalable signal) {
+            if (signal.getSerializable() instanceof MetaSignal.MetaRequest) {
+                MetaSignal.MetaRequest metaSignal = (MetaSignal.MetaRequest) signal.getSerializable();
+                switch (metaSignal.request) {
                     case SERVERNAME:
-                        signalQueue.add(metaSignal.createResponse(name));
+                        signalQueue.add(metaSignal.request.createResponse(SignalAPI.getInstance().getServerName()));
                         break;
                 }
             } else if (signal.getSerializable() instanceof MetaSignal.MetaResponse) {
