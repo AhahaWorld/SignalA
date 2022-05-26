@@ -6,7 +6,11 @@ import info.ahaha.signala.Signalable;
 import java.io.Serializable;
 
 public enum MetaSignal implements Serializable {
-    SERVERNAME, CONNECT_SERVER, REMOVE_SERVER, SUCCESS, ONE_MORE;
+    SUCCESS, ONE_MORE,
+    GET_SERVER_INFO,
+    CONNECT_SERVER /*WithData Type : ServerInfo*/,
+    REMOVE_SERVER,
+    CONNECTIONS_VERIFY /*WithData Type : ConnectionsVerificationData*/;
 
     public Signalable toSignal() {
         return new Signal("MetaSignal", new MetaRequest(this, null));
@@ -19,7 +23,6 @@ public enum MetaSignal implements Serializable {
     public Signalable createResponse(Serializable serializable) {
         return new Signal("MetaSignal_res", new MetaResponse(this, serializable));
     }
-
 
     public static class MetaRequest implements Serializable {
         public final MetaSignal request;

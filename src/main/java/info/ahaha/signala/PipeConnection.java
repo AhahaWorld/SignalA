@@ -1,5 +1,7 @@
 package info.ahaha.signala;
 
+import info.ahaha.signala.metasignal.ServerInfo;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -35,6 +37,11 @@ public class PipeConnection implements Connection {
     @Override
     public void deleteChannel(Channel channel) {
         channels.remove(channel.name());
+    }
+
+    @Override
+    public ServerInfo getServerInfo() {
+        return SignalAPI.getInstance().getServerInfo();
     }
 
     @Override

@@ -1,6 +1,9 @@
 package info.ahaha.signala;
 
+import info.ahaha.signala.listener.ConnectionDefaultListener;
 import info.ahaha.signala.metasignal.MetaSignal;
+import info.ahaha.signala.metasignal.ServerInfo;
+import info.ahaha.signala.schedule.Schedule;
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -19,7 +22,7 @@ public class SocketConnection implements Connection {
 
     protected Socket socket;
     protected Thread inWorker, outWorker;
-    protected String name;
+    protected ServerInfo serverInfo = ServerInfo.NOT_YET_KNOWN;
 
     protected BlockingQueue<Signalable> signalQueue;
 
@@ -41,14 +44,19 @@ public class SocketConnection implements Connection {
         this.inWorker = new Thread(new ConnectionInWorker());
         this.outWorker = new Thread(new ConnectionOutWorker());
 
-        signalQueue.add(MetaSignal.SERVERNAME.toSignal());
+        signalQueue.add(MetaSignal.GET_SERVER_INFO.toSignal());
 
-        listeners.add(new DefaultListener());
+        listeners.add(new ConnectionDefaultListener(serverInfo -> this.serverInfo = serverInfo));
 
         inWorker.setDaemon(true);
         outWorker.setDaemon(true);
         inWorker.start();
         outWorker.start();
+    }
+
+    public SocketConnection(ServerInfo serverInfo, int signalCapacity) throws IOException {
+        this(serverInfo.host, serverInfo.port, signalCapacity);
+        this.serverInfo = serverInfo;
     }
 
     public SocketConnection(String host, int port, int signalCapacity) throws IOException {
@@ -63,9 +71,9 @@ public class SocketConnection implements Connection {
         this.inWorker = new Thread(new ConnectionInWorker());
         this.outWorker = new Thread(new ConnectionOutWorker());
 
-        signalQueue.add(MetaSignal.SERVERNAME.toSignal());
+        signalQueue.add(MetaSignal.GET_SERVER_INFO.toSignal());
 
-        listeners.add(new DefaultListener());
+        listeners.add(new ConnectionDefaultListener(serverInfo -> this.serverInfo = serverInfo));
 
         inWorker.setDaemon(true);
         outWorker.setDaemon(true);
@@ -80,7 +88,12 @@ public class SocketConnection implements Connection {
 
     @Override
     public String name() {
-        return name;
+        return serverInfo.name;
+    }
+
+    @Override
+    public ServerInfo getServerInfo() {
+        return serverInfo;
     }
 
     public Socket getSocket() {
@@ -101,25 +114,26 @@ public class SocketConnection implements Connection {
 
     @Override
     public void close() {
+
         try {
             socket.close();
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            e.printStackTrace();
         }
         try {
             out.flush();
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            e.printStackTrace();
         }
         try {
             out.close();
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            e.printStackTrace();
         }
         try {
             in.close();
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            e.printStackTrace();
         }
     }
 
@@ -142,6 +156,35 @@ public class SocketConnection implements Connection {
             ((ChannelSignal) signal).getChannel().call(signal);
     }
 
+    Runnable getInWorkerReconstruction() {
+        return () -> {
+            try {
+                in = new ObjectInputStream(socket.getInputStream());
+            } catch (IOException ex) {
+                SignalAPI.getInstance().getScheduler().schedulingAsync(getInWorkerReconstruction(), 2 * 100);
+            }
+            inWorker = new Thread(new ConnectionInWorker());
+            inWorker.setDaemon(true);
+            System.out.println(name() + " ConnectionInWorker start");
+            inWorker.start();
+        };
+    }
+
+    Runnable getOutWorkerReconstruction() {
+        return () -> {
+            try {
+                out = new ObjectOutputStream(socket.getOutputStream());
+            } catch (IOException ex) {
+                SignalAPI.getInstance().getScheduler().schedulingAsync(getInWorkerReconstruction(), 2 * 100);
+            }
+            outWorker = new Thread(new ConnectionOutWorker());
+            outWorker.setDaemon(true);
+            System.out.println(name() + " ConnectionOutWorker start");
+            outWorker.start();
+        };
+    }
+
+
     public class ConnectionInWorker implements Runnable {
         boolean cancelled = false;
 
@@ -158,7 +201,14 @@ public class SocketConnection implements Connection {
                     signal.attach(outer);
                     outer.call(signal);
                 } catch (IOException | ClassNotFoundException e) {
-                    e.printStackTrace();
+                    try {
+                        in.close();
+                    } catch (IOException ex) {
+                        ex.printStackTrace();
+                    }
+                    System.out.println(name() + " ConnectionInWorker stop");
+                    SignalAPI.getInstance().getScheduler().schedulingAsync(getInWorkerReconstruction(), 2 * 100);
+                    return;
                 }
         }
 
@@ -177,37 +227,20 @@ public class SocketConnection implements Connection {
                     Signalable signal = signalQueue.poll(10, TimeUnit.SECONDS);
                     out.writeObject(signal);
                 } catch (InterruptedException | IOException e) {
-                    e.printStackTrace();
+                    try {
+                        out.flush();
+                        out.close();
+                    } catch (IOException ex) {
+                        ex.printStackTrace();
+                    }
+                    System.out.println(name() + " ConnectionOutWorker stop");
+                    SignalAPI.getInstance().getScheduler().schedulingAsync(getOutWorkerReconstruction(), 2 * 100);
+                    return;
                 }
         }
 
         public void setCancelled(boolean cancelled) {
             this.cancelled = cancelled;
-        }
-    }
-
-    class DefaultListener implements SignalListener {
-        @Override
-        public void listen(Signalable signal) {
-            if (signal.getSerializable() instanceof MetaSignal.MetaRequest) {
-                MetaSignal.MetaRequest metaSignal = (MetaSignal.MetaRequest) signal.getSerializable();
-                switch (metaSignal.request) {
-                    case SERVERNAME:
-                        signalQueue.add(metaSignal.request.createResponse(SignalAPI.getInstance().getServerName()));
-                        break;
-                }
-            } else if (signal.getSerializable() instanceof MetaSignal.MetaResponse) {
-                MetaSignal.MetaResponse metaRes = (MetaSignal.MetaResponse) signal.getSerializable();
-                switch (metaRes.request) {
-                    case SERVERNAME:
-                        if (!(metaRes.response instanceof String)) {
-                            signalQueue.add(MetaSignal.SERVERNAME.toSignal());
-                            break;
-                        }
-                        name = (String) metaRes.response;
-                        break;
-                }
-            }
         }
     }
 }

@@ -1,5 +1,7 @@
 package info.ahaha.signala;
 
+import info.ahaha.signala.metasignal.ServerInfo;
+
 public interface Connection extends SignalRegister {
     void sendSignal(Signalable signal);
 
@@ -8,6 +10,8 @@ public interface Connection extends SignalRegister {
     Channel getChannel(String name);
 
     void deleteChannel(Channel channel);
+
+    ServerInfo getServerInfo();
 
     void close();
 }
