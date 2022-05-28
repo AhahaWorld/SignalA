@@ -22,7 +22,7 @@ public class SocketConnection implements Connection {
     protected ServerInfo serverInfo = ServerInfo.NOT_YET_KNOWN;
     protected ConnectionState connectionState = ConnectionState.NORMAL;
 
-    boolean inStopped = false, outStopped = false, serializeValidationLayer = SignalAPI.getInstance().enabledValidationLayer();
+    boolean inStopped = false, outStopped = false, serializeValidationLayer = SignalAPI.getInstance().isEnabledValidationLayer();
 
     protected BlockingQueue<Signalable> signalQueue;
 

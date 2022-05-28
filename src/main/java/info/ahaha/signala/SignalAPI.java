@@ -35,10 +35,16 @@ public interface SignalAPI {
     void removeConnectionByAbnormal(Connection connection);
 
     void logging(String... msg);
+
     void logging(Throwable throwable);
 
     void assistLogging(String... msg);
+
     void assistLogging(Throwable throwable);
 
-    boolean enabledValidationLayer();
+    boolean isEnabledValidationLayer();
+
+    void enableValidationLayer();
+
+    void disableValidationLayer();
 }
