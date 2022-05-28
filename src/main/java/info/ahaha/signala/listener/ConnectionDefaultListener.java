@@ -9,8 +9,8 @@ import info.ahaha.signala.metasignal.ConnectionsVerificationData;
 import info.ahaha.signala.metasignal.MetaSignal;
 import info.ahaha.signala.metasignal.ServerInfo;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class ConnectionDefaultListener implements SignalListener {
     Setter<ServerInfo> serverInfoSetter;
@@ -48,29 +48,28 @@ public class ConnectionDefaultListener implements SignalListener {
                     if (!(metaSignal.withData instanceof ConnectionsVerificationData))
                         break;
                     ConnectionsVerificationData data = (ConnectionsVerificationData) metaSignal.withData;
-                    List<ServerInfo> unmatched = new ArrayList<>();
-                    // for receiver
-                    for (ServerInfo vInfo : data.infos) {
-                        if (vInfo.id.equals(SignalAPI.getInstance().getServerID()))
+
+                    List<ServerInfo> hasSenders = data.infos.stream().map(info -> info.serverInfo).collect(Collectors.toList());
+                    List<ServerInfo> hasReceivers = SignalAPI.getInstance().getConnections().stream().map(Connection::getServerInfo).collect(Collectors.toList());
+
+                    for (ServerInfo hasSender : hasSenders) {
+                        if (hasSender.id.equals(ServerInfo.NOT_YET_KNOWN.id))
                             continue;
-                        for (Connection hInfo : SignalAPI.getInstance().getConnections()) {
-                            if (vInfo.id.equals(hInfo.getServerInfo().id))
+                        for (ServerInfo hasReceiver : hasReceivers)
+                            if (hasSender.id.equals(hasReceiver.id))
                                 continue;
-                        }
-                        unmatched.add(vInfo);
+                        SignalAPI.getInstance().addConnection(hasSender);
                     }
-                    for (ServerInfo serverInfo : unmatched)
-                        SignalAPI.getInstance().addConnection(serverInfo);
-                    // for sender
-                    unmatched.clear();
-                    for (Connection hInfo : SignalAPI.getInstance().getConnections()) {
-                        for (ServerInfo vInfo : data.infos)
-                            if (vInfo.id.equals(hInfo.getServerInfo().id))
+
+                    for (ServerInfo hasReceiver : hasReceivers) {
+                        if (hasReceiver.id.equals(ServerInfo.NOT_YET_KNOWN.id))
+                            continue;
+                        for (ServerInfo hasSender : hasSenders)
+                            if (hasReceiver.id.equals(hasSender.id))
                                 continue;
-                        unmatched.add(hInfo.getServerInfo());
+                        signal.getConnection().sendSignal(MetaSignal.CONNECT_SERVER.toSignalWithData(hasReceiver));
                     }
-                    for (ServerInfo serverInfo : unmatched)
-                        signal.getConnection().sendSignal(MetaSignal.CONNECT_SERVER.toSignalWithData(serverInfo));
+
                     break;
                 }
             }
@@ -88,7 +87,7 @@ public class ConnectionDefaultListener implements SignalListener {
                 case CONNECT_SERVER: {
                     if (metaRes.response == null)
                         break;
-                    if (metaRes.response instanceof MetaSignal)
+                    if (!(metaRes.response instanceof MetaSignal))
                         break;
                     if (metaRes.response != MetaSignal.SUCCESS)
                         signal.getConnection().sendSignal(MetaSignal.CONNECT_SERVER.toSignal());

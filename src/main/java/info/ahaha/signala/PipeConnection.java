@@ -45,6 +45,11 @@ public class PipeConnection implements Connection {
     }
 
     @Override
+    public ConnectionState getConnectionInfo() {
+        return ConnectionState.NORMAL;
+    }
+
+    @Override
     public void close() {
     }
 

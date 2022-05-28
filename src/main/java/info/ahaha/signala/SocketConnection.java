@@ -3,11 +3,8 @@ package info.ahaha.signala;
 import info.ahaha.signala.listener.ConnectionDefaultListener;
 import info.ahaha.signala.metasignal.MetaSignal;
 import info.ahaha.signala.metasignal.ServerInfo;
-import info.ahaha.signala.schedule.Schedule;
 
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
+import java.io.*;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -23,6 +20,9 @@ public class SocketConnection implements Connection {
     protected Socket socket;
     protected Thread inWorker, outWorker;
     protected ServerInfo serverInfo = ServerInfo.NOT_YET_KNOWN;
+    protected ConnectionState connectionState = ConnectionState.NORMAL;
+
+    boolean inStopped = false, outStopped = false, serializeValidationLayer = SignalAPI.getInstance().enabledValidationLayer();
 
     protected BlockingQueue<Signalable> signalQueue;
 
@@ -91,9 +91,22 @@ public class SocketConnection implements Connection {
         return serverInfo.name;
     }
 
+    public void setSerializeValidationLayer(boolean serializeValidationLayer) {
+        this.serializeValidationLayer = serializeValidationLayer;
+    }
+
+    public boolean isSerializeValidationLayer() {
+        return serializeValidationLayer;
+    }
+
     @Override
     public ServerInfo getServerInfo() {
         return serverInfo;
+    }
+
+    @Override
+    public ConnectionState getConnectionInfo() {
+        return connectionState;
     }
 
     public Socket getSocket() {
@@ -114,26 +127,39 @@ public class SocketConnection implements Connection {
 
     @Override
     public void close() {
+        SignalAPI.getInstance().getScheduler().cancelSchedules(this);
 
-        try {
-            socket.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
         try {
             out.flush();
         } catch (IOException e) {
-            e.printStackTrace();
+            if (connectionState != ConnectionState.ABNORMAL_SOCKET_DISCONNECT)
+                SignalAPI.getInstance().logging(e);
+            else
+                SignalAPI.getInstance().assistLogging(e);
         }
         try {
             out.close();
         } catch (IOException e) {
-            e.printStackTrace();
+            if (connectionState != ConnectionState.ABNORMAL_SOCKET_DISCONNECT)
+                SignalAPI.getInstance().logging(e);
+            else
+                SignalAPI.getInstance().assistLogging(e);
         }
         try {
             in.close();
         } catch (IOException e) {
-            e.printStackTrace();
+            if (connectionState != ConnectionState.ABNORMAL_SOCKET_DISCONNECT)
+                SignalAPI.getInstance().logging(e);
+            else
+                SignalAPI.getInstance().assistLogging(e);
+        }
+        try {
+            socket.close();
+        } catch (IOException e) {
+            if (connectionState != ConnectionState.ABNORMAL_SOCKET_DISCONNECT)
+                SignalAPI.getInstance().logging(e);
+            else
+                SignalAPI.getInstance().assistLogging(e);
         }
     }
 
@@ -156,12 +182,18 @@ public class SocketConnection implements Connection {
             ((ChannelSignal) signal).getChannel().call(signal);
     }
 
-    Runnable getInWorkerReconstruction() {
+    Runnable getInWorkerReconstruction(int counter) {
         return () -> {
             try {
                 in = new ObjectInputStream(socket.getInputStream());
             } catch (IOException ex) {
-                SignalAPI.getInstance().getScheduler().schedulingAsync(getInWorkerReconstruction(), 2 * 100);
+                SignalAPI.getInstance().assistLogging(ex);
+                if (counter <= 0) {
+                    SignalAPI.getInstance().removeConnectionByAbnormal(this);
+                    return;
+                }
+                SignalAPI.getInstance().getScheduler().schedulingAsync(getInWorkerReconstruction(counter - 1), 2 * 100);
+                return;
             }
             inWorker = new Thread(new ConnectionInWorker());
             inWorker.setDaemon(true);
@@ -170,12 +202,17 @@ public class SocketConnection implements Connection {
         };
     }
 
-    Runnable getOutWorkerReconstruction() {
+    Runnable getOutWorkerReconstruction(int counter) {
         return () -> {
             try {
                 out = new ObjectOutputStream(socket.getOutputStream());
             } catch (IOException ex) {
-                SignalAPI.getInstance().getScheduler().schedulingAsync(getInWorkerReconstruction(), 2 * 100);
+                if (counter <= 0) {
+                    SignalAPI.getInstance().removeConnectionByAbnormal(this);
+                    return;
+                }
+                SignalAPI.getInstance().getScheduler().schedulingAsync(getInWorkerReconstruction(counter - 1), 2 * 100);
+                return;
             }
             outWorker = new Thread(new ConnectionOutWorker());
             outWorker.setDaemon(true);
@@ -190,6 +227,9 @@ public class SocketConnection implements Connection {
 
         @Override
         public void run() {
+            inStopped = false;
+            if (connectionState == ConnectionState.ABNORMAL_SOCKET_IO)
+                connectionState = inStopped || outStopped ? ConnectionState.ABNORMAL_SOCKET_IO : ConnectionState.NORMAL;
             while (!cancelled)
                 try {
                     Object object = in.readObject();
@@ -201,13 +241,18 @@ public class SocketConnection implements Connection {
                     signal.attach(outer);
                     outer.call(signal);
                 } catch (IOException | ClassNotFoundException e) {
+                    SignalAPI.getInstance().assistLogging(e);
                     try {
                         in.close();
                     } catch (IOException ex) {
-                        ex.printStackTrace();
+                        SignalAPI.getInstance().logging(ex);
+                        connectionState = ConnectionState.ABNORMAL_SOCKET_DISCONNECT;
                     }
+                    inStopped = true;
+                    if (connectionState == ConnectionState.NORMAL)
+                        connectionState = ConnectionState.ABNORMAL_SOCKET_IO;
                     System.out.println(name() + " ConnectionInWorker stop");
-                    SignalAPI.getInstance().getScheduler().schedulingAsync(getInWorkerReconstruction(), 2 * 100);
+                    SignalAPI.getInstance().getScheduler().schedulingAsync(getInWorkerReconstruction(10), 2 * 100);
                     return;
                 }
         }
@@ -222,19 +267,40 @@ public class SocketConnection implements Connection {
 
         @Override
         public void run() {
+            outStopped = false;
+            if (connectionState == ConnectionState.ABNORMAL_SOCKET_IO)
+                connectionState = inStopped || outStopped ? ConnectionState.ABNORMAL_SOCKET_IO : ConnectionState.NORMAL;
             while (!cancelled)
                 try {
                     Signalable signal = signalQueue.poll(10, TimeUnit.SECONDS);
+                    if (signal == null)
+                        continue;
+                    if (serializeValidationLayer) {
+                        try {
+                            ByteArrayOutputStream stream = new ByteArrayOutputStream();
+                            ObjectOutputStream out = new ObjectOutputStream(stream);
+                            out.writeObject(signal);
+                        } catch (NotSerializableException e) {
+                            SignalAPI.getInstance().assistLogging("NotSerializableException : " + e.getMessage() + "\n" +
+                                    " - " + signal.getSerializable().getClass().getName());
+                            continue;
+                        }
+                    }
                     out.writeObject(signal);
                 } catch (InterruptedException | IOException e) {
+                    SignalAPI.getInstance().assistLogging(e);
                     try {
                         out.flush();
                         out.close();
                     } catch (IOException ex) {
-                        ex.printStackTrace();
+                        SignalAPI.getInstance().logging(ex);
+                        connectionState = ConnectionState.ABNORMAL_SOCKET_DISCONNECT;
                     }
+                    outStopped = true;
+                    if (connectionState == ConnectionState.NORMAL)
+                        connectionState = ConnectionState.ABNORMAL_SOCKET_IO;
                     System.out.println(name() + " ConnectionOutWorker stop");
-                    SignalAPI.getInstance().getScheduler().schedulingAsync(getOutWorkerReconstruction(), 2 * 100);
+                    SignalAPI.getInstance().getScheduler().schedulingAsync(getOutWorkerReconstruction(10), 2 * 100);
                     return;
                 }
         }
