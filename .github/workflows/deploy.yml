@@ -17,14 +17,11 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-java@v3
         env:
-          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
-          MAVEN_PASSWORD: ${{ secrets.MAVEN_USER_PASSWORD }}
-          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+          GITHUB_ACTOR: ${{ secrets.MAVEN_USERNAME }}
+          GITHUB_TOKEN: ${{ secrets.MAVEN_USER_PASSWORD }}
         with:
           java-version: ${{ env.JAVA_VERSION }}
           java-package: ${{ env.JAVA_PACKAGE }}
           architecture: ${{ env.JAVA_ARCHITECTURE }}
-          server-username: MAVEN_USERNAME
-          server-password: MAVEN_USER_PASSWORD
       - name: Publish package
         run: mvn --batch-mode deploy
