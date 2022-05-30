@@ -23,5 +23,6 @@ jobs:
           java-version: ${{ env.JAVA_VERSION }}
           java-package: ${{ env.JAVA_PACKAGE }}
           architecture: ${{ env.JAVA_ARCHITECTURE }}
+          distribution: 'adopt'
       - name: Publish package
         run: mvn --batch-mode deploy
