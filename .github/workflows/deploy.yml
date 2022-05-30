@@ -3,7 +3,7 @@ name: Deploy
 on: workflow_dispatch
 
 env:
-  JAVA_VERSION: '1.8'
+  JAVA_VERSION: 8
   JAVA_PACKAGE: jdk
   JAVA_ARCHITECTURE: x64
 
