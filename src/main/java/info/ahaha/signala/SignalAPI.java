@@ -1,5 +1,6 @@
 package info.ahaha.signala;
 
+import info.ahaha.signala.metasignal.Feature;
 import info.ahaha.signala.metasignal.ServerInfo;
 import info.ahaha.signala.schedule.Scheduler;
 
@@ -48,9 +49,12 @@ public interface SignalAPI {
 
     void disableValidationLayer();
 
-    boolean haveFeature(String feature);
+    List<Feature> getFeatures();
 
-    List<String> getFeatures();
+    Feature getFeature(String featureName);
 
-    void addFeature(String feature);
+    boolean haveFeature(Feature feature);
+    boolean haveFeature(String featureName);
+
+    void addFeature(Feature feature);
 }
