@@ -47,4 +47,10 @@ public interface SignalAPI {
     void enableValidationLayer();
 
     void disableValidationLayer();
+
+    boolean haveFeature(String feature);
+
+    List<String> getFeatures();
+
+    void addFeature(String feature);
 }
