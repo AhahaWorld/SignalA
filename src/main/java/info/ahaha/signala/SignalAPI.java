@@ -4,7 +4,6 @@ import info.ahaha.signala.metasignal.Feature;
 import info.ahaha.signala.metasignal.ServerInfo;
 import info.ahaha.signala.schedule.Scheduler;
 
-import java.net.Socket;
 import java.util.List;
 import java.util.UUID;
 
@@ -13,27 +12,25 @@ public interface SignalAPI {
         return InstanceHolder.SIGNAL_API_INSTANCE;
     }
 
-    List<Connection> getConnections();
+    static ConnectionManager getConnectionManagerInstance() {
+        return InstanceHolder.SIGNAL_API_INSTANCE.getConnectionManager();
+    }
 
-    Connection getCenterConnection();
+    static Scheduler getSchedulerInstance() {
+        return InstanceHolder.SIGNAL_API_INSTANCE.getScheduler();
+    }
+
+    ConnectionManager getConnectionManager();
+
+    Scheduler getScheduler();
+
+    List<Connection> getConnections();
 
     String getServerName();
 
     ServerInfo getServerInfo();
 
     UUID getServerID();
-
-    Connection addConnection(String host, int port);
-
-    Connection addConnection(Socket socket);
-
-    Connection addConnection(ServerInfo info);
-
-    Scheduler getScheduler();
-
-    void removeConnection(Connection connection);
-
-    void removeConnectionByAbnormal(Connection connection);
 
     void logging(String... msg);
 
@@ -54,6 +51,7 @@ public interface SignalAPI {
     Feature getFeature(String featureName);
 
     boolean haveFeature(Feature feature);
+
     boolean haveFeature(String featureName);
 
     void addFeature(Feature feature);
