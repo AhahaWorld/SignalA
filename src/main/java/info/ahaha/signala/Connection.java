@@ -11,6 +11,8 @@ public interface Connection extends SignalRegister {
 
     void deleteChannel(Channel channel);
 
+    void deleteChannel(String name);
+
     ServerInfo getServerInfo();
 
     ConnectionState getConnectionInfo();
