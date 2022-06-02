@@ -32,12 +32,10 @@ public class Signal implements Signalable{
         this.connection = connection;
     }
 
-    @Override
     public void setSignalName(String signalName) {
         this.signalName = signalName;
     }
 
-    @Override
     public void setSerializable(Serializable serializable) {
         this.serializable = serializable;
     }
