@@ -55,18 +55,28 @@ public class ConnectionDefaultListener implements SignalListener {
                     for (ServerInfo hasSender : hasSenders) {
                         if (hasSender.id.equals(ServerInfo.NOT_YET_KNOWN.id))
                             continue;
+                        boolean found = false;
                         for (ServerInfo hasReceiver : hasReceivers)
-                            if (hasSender.id.equals(hasReceiver.id))
-                                continue;
+                            if (hasSender.id.equals(hasReceiver.id)) {
+                                found = true;
+                                break;
+                            }
+                        if (found)
+                            continue;
                         SignalAPI.getConnectionManagerInstance().addConnection(hasSender);
                     }
 
                     for (ServerInfo hasReceiver : hasReceivers) {
                         if (hasReceiver.id.equals(ServerInfo.NOT_YET_KNOWN.id))
                             continue;
+                        boolean found = false;
                         for (ServerInfo hasSender : hasSenders)
-                            if (hasReceiver.id.equals(hasSender.id))
-                                continue;
+                            if (hasReceiver.id.equals(hasSender.id)) {
+                                found = true;
+                                break;
+                            }
+                        if (found)
+                            continue;
                         signal.getConnection().sendSignal(MetaSignal.CONNECT_SERVER.toSignalWithData(hasReceiver));
                     }
 
