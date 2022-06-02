@@ -10,8 +10,4 @@ public interface Signalable extends Serializable {
     Connection getConnection();
 
     void attach(Connection connection);
-
-    void setSignalName(String signalName);
-
-    void setSerializable(Serializable serializable);
 }
