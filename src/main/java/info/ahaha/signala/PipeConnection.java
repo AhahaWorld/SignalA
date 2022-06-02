@@ -40,6 +40,11 @@ public class PipeConnection implements Connection {
     }
 
     @Override
+    public void deleteChannel(String name) {
+        channels.remove(name);
+    }
+
+    @Override
     public ServerInfo getServerInfo() {
         return SignalAPI.getInstance().getServerInfo();
     }
