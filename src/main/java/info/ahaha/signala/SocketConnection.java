@@ -13,8 +13,18 @@ import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiConsumer;
 
 public class SocketConnection implements Connection {
+    /***
+     * 接続できなかった時また接続できるか試すまでの間隔 (MilliSec)
+     */
+    public static int SERVER_IO_THREAD_CONSTRUCTION_INTERVAL_MILLI_SEC = 2 * 100;
+    /***
+     * 接続できなかった時また接続できるか試す回数の上限
+     */
+    public static int SERVER_IO_THREAD_CONSTRUCTION_MAX_COUNT = 10;
+
     protected final SocketConnection outer;
 
     protected Socket socket;
@@ -22,9 +32,27 @@ public class SocketConnection implements Connection {
     protected ServerInfo serverInfo = ServerInfo.NOT_YET_KNOWN;
     protected ConnectionState connectionState = ConnectionState.NORMAL;
 
-    boolean inStopped = false, outStopped = false, serializeValidationLayer = SignalAPI.getInstance().isEnabledValidationLayer();
+    boolean inStopped = false, outStopped = false,
+    /***
+     * trueの場合、Signalを送る前に実際にシリアライズ出来るか検証される。
+     * (検証はそこそこコストが高いので開発途中や定期的にConnectionが落ちる場合以外は避けるのが望ましい。)
+     */
+    serializeValidationLayer = SignalAPI.getInstance().isEnabledValidationLayer();
 
     protected BlockingQueue<Signalable> signalQueue;
+    /***
+     * 再接続できた場合このコンテナに残っているものは再送される。
+     * (なので、送って失敗した時別の方法で送ったならコンテナから消すのが望ましい。)
+     */
+    protected List<Signalable> failedSendSignals = new ArrayList<>();
+    /***
+     * Signalの受け取りに失敗した場合呼ばれHookのコンテナ。
+     ***/
+    protected List<BiConsumer<SocketConnection, Object>> failedReceiveHooks = new ArrayList<>();
+    /***
+     * Signalの送信に失敗した場合呼ばれるHookのコンテナ。
+     ***/
+    protected List<BiConsumer<SocketConnection, Signalable>> failedSendHooks = new ArrayList<>();
 
     protected Map<String, Channel> channels = new HashMap<>();
     protected List<SignalListener> listeners = new ArrayList<>();
@@ -113,6 +141,38 @@ public class SocketConnection implements Connection {
         return socket;
     }
 
+    public List<BiConsumer<SocketConnection, Object>> getFailedReceiveHooks() {
+        return failedReceiveHooks;
+    }
+
+    public List<BiConsumer<SocketConnection, Signalable>> getFailedSendHooks() {
+        return failedSendHooks;
+    }
+
+    public List<Signalable> getFailedSendSignals() {
+        return failedSendSignals;
+    }
+
+    public void addFailedReceiveHook(BiConsumer<SocketConnection, Object> hook) {
+        failedReceiveHooks.add(hook);
+    }
+
+    public void addFailedSendHook(BiConsumer<SocketConnection, Signalable> hook) {
+        failedSendHooks.add(hook);
+    }
+
+    public boolean removeFailedReceiveHooks(BiConsumer<SocketConnection, Object> hook) {
+        return failedReceiveHooks.remove(hook);
+    }
+
+    public boolean removeFailedSendHooks(BiConsumer<SocketConnection, Signalable> hook) {
+        return failedSendHooks.remove(hook);
+    }
+
+    public boolean removeFailedSendSignals(Signalable signalable) {
+        return failedSendSignals.remove(signalable);
+    }
+
     @Override
     public Channel getChannel(String name) {
         if (!channels.containsKey(name))
@@ -123,6 +183,11 @@ public class SocketConnection implements Connection {
     @Override
     public void deleteChannel(Channel channel) {
         channels.remove(channel.name());
+    }
+
+    @Override
+    public void deleteChannel(String name) {
+        channels.remove(name);
     }
 
     @Override
@@ -189,10 +254,10 @@ public class SocketConnection implements Connection {
             } catch (IOException ex) {
                 SignalAPI.getInstance().assistLogging(ex);
                 if (counter <= 0) {
-                    SignalAPI.getInstance().removeConnectionByAbnormal(this);
+                    SignalAPI.getConnectionManagerInstance().removeConnectionByAbnormal(this);
                     return;
                 }
-                SignalAPI.getInstance().getScheduler().schedulingAsync(getInWorkerReconstruction(counter - 1), 2 * 100);
+                SignalAPI.getInstance().getScheduler().schedulingAsync(getInWorkerReconstruction(counter - 1), SERVER_IO_THREAD_CONSTRUCTION_INTERVAL_MILLI_SEC);
                 return;
             }
             inWorker = new Thread(new ConnectionInWorker());
@@ -208,10 +273,10 @@ public class SocketConnection implements Connection {
                 out = new ObjectOutputStream(socket.getOutputStream());
             } catch (IOException ex) {
                 if (counter <= 0) {
-                    SignalAPI.getInstance().removeConnectionByAbnormal(this);
+                    SignalAPI.getConnectionManagerInstance().removeConnectionByAbnormal(this);
                     return;
                 }
-                SignalAPI.getInstance().getScheduler().schedulingAsync(getInWorkerReconstruction(counter - 1), 2 * 100);
+                SignalAPI.getInstance().getScheduler().schedulingAsync(getInWorkerReconstruction(counter - 1), SERVER_IO_THREAD_CONSTRUCTION_INTERVAL_MILLI_SEC);
                 return;
             }
             outWorker = new Thread(new ConnectionOutWorker());
@@ -230,9 +295,10 @@ public class SocketConnection implements Connection {
             inStopped = false;
             if (connectionState == ConnectionState.ABNORMAL_SOCKET_IO)
                 connectionState = inStopped || outStopped ? ConnectionState.ABNORMAL_SOCKET_IO : ConnectionState.NORMAL;
-            while (!cancelled)
+            while (!cancelled) {
+                Object object = null;
                 try {
-                    Object object = in.readObject();
+                    object = in.readObject();
                     if (object == null)
                         continue;
                     if (!(object instanceof Signalable))
@@ -242,6 +308,8 @@ public class SocketConnection implements Connection {
                     outer.call(signal);
                 } catch (IOException | ClassNotFoundException e) {
                     SignalAPI.getInstance().assistLogging(e);
+                    for (BiConsumer<SocketConnection, Object> hook : failedReceiveHooks)
+                        hook.accept(outer, object);
                     try {
                         in.close();
                     } catch (IOException ex) {
@@ -252,9 +320,10 @@ public class SocketConnection implements Connection {
                     if (connectionState == ConnectionState.NORMAL)
                         connectionState = ConnectionState.ABNORMAL_SOCKET_IO;
                     System.out.println(name() + " ConnectionInWorker stop");
-                    SignalAPI.getInstance().getScheduler().schedulingAsync(getInWorkerReconstruction(10), 2 * 100);
+                    SignalAPI.getInstance().getScheduler().schedulingAsync(getInWorkerReconstruction(SERVER_IO_THREAD_CONSTRUCTION_MAX_COUNT), SERVER_IO_THREAD_CONSTRUCTION_INTERVAL_MILLI_SEC);
                     return;
                 }
+            }
         }
 
         public void setCancelled(boolean cancelled) {
@@ -270,9 +339,10 @@ public class SocketConnection implements Connection {
             outStopped = false;
             if (connectionState == ConnectionState.ABNORMAL_SOCKET_IO)
                 connectionState = inStopped || outStopped ? ConnectionState.ABNORMAL_SOCKET_IO : ConnectionState.NORMAL;
-            while (!cancelled)
+            while (!cancelled) {
+                Signalable signal = null;
                 try {
-                    Signalable signal = signalQueue.poll(10, TimeUnit.SECONDS);
+                    signal = signalQueue.poll(10, TimeUnit.SECONDS);
                     if (signal == null)
                         continue;
                     if (serializeValidationLayer) {
@@ -289,6 +359,9 @@ public class SocketConnection implements Connection {
                     out.writeObject(signal);
                 } catch (InterruptedException | IOException e) {
                     SignalAPI.getInstance().assistLogging(e);
+                    failedSendSignals.add(signal);
+                    for (BiConsumer<SocketConnection, Signalable> hook : failedSendHooks)
+                        hook.accept(outer, signal);
                     try {
                         out.flush();
                         out.close();
@@ -300,9 +373,10 @@ public class SocketConnection implements Connection {
                     if (connectionState == ConnectionState.NORMAL)
                         connectionState = ConnectionState.ABNORMAL_SOCKET_IO;
                     System.out.println(name() + " ConnectionOutWorker stop");
-                    SignalAPI.getInstance().getScheduler().schedulingAsync(getOutWorkerReconstruction(10), 2 * 100);
+                    SignalAPI.getInstance().getScheduler().schedulingAsync(getOutWorkerReconstruction(SERVER_IO_THREAD_CONSTRUCTION_MAX_COUNT), SERVER_IO_THREAD_CONSTRUCTION_INTERVAL_MILLI_SEC);
                     return;
                 }
+            }
         }
 
         public void setCancelled(boolean cancelled) {
