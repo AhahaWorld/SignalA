@@ -29,7 +29,7 @@ public class ConnectionDefaultListener implements SignalListener {
                     break;
                 }
                 case REMOVE_SERVER: {
-                    SignalAPI.getInstance().removeConnection(signal.getConnection());
+                    SignalAPI.getConnectionManagerInstance().removeConnection(signal.getConnection());
                     break;
                 }
                 case CONNECT_SERVER: {
@@ -38,8 +38,8 @@ public class ConnectionDefaultListener implements SignalListener {
                     if (!(metaSignal.withData instanceof ServerInfo))
                         break;
                     ServerInfo info = (ServerInfo) metaSignal.withData;
-                    SignalAPI.getInstance().addConnection(info);
-                    SignalAPI.getInstance().getCenterConnection().sendSignal(metaSignal.request.createResponse(MetaSignal.SUCCESS));
+                    SignalAPI.getConnectionManagerInstance().addConnection(info);
+                    signal.getConnection().sendSignal(metaSignal.request.createResponse(MetaSignal.SUCCESS));
                     break;
                 }
                 case CONNECTIONS_VERIFY: {
@@ -58,7 +58,7 @@ public class ConnectionDefaultListener implements SignalListener {
                         for (ServerInfo hasReceiver : hasReceivers)
                             if (hasSender.id.equals(hasReceiver.id))
                                 continue;
-                        SignalAPI.getInstance().addConnection(hasSender);
+                        SignalAPI.getConnectionManagerInstance().addConnection(hasSender);
                     }
 
                     for (ServerInfo hasReceiver : hasReceivers) {
