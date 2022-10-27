@@ -8,9 +8,9 @@ import info.ahaha.signala.Signalable;
 import java.io.Serializable;
 
 public class RoutingSignal implements Signalable {
-    transient Connection connection;
     protected final Rout rout;
     protected final Signalable signalable;
+    transient Connection connection;
 
     public RoutingSignal(Rout rout, Signalable signalable) {
         this.rout = rout;
@@ -37,7 +37,7 @@ public class RoutingSignal implements Signalable {
         this.connection = connection;
     }
 
-    public void next(){
+    public void next() {
         SignalAPI.getConnectionManagerInstance()
                 .getConnection(rout.pass.pop())
                 .sendSignal(this);

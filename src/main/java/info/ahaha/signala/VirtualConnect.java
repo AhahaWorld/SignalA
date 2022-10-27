@@ -50,7 +50,8 @@ public class VirtualConnect implements Connection {
     }
 
     @Override
-    public void close() {}
+    public void close() {
+    }
 
     @Override
     public void registerListener(SignalListener signalListener) {

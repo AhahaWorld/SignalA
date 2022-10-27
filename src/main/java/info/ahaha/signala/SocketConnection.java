@@ -38,7 +38,9 @@ public class SocketConnection implements Connection {
      * (検証はそこそこコストが高いので開発途中や定期的にConnectionが落ちる場合以外は避けるのが望ましい。)
      */
     serializeValidationLayer = SignalAPI.getInstance().isEnabledValidationLayer();
-
+    // ------------- signal -------------
+    protected ObjectInputStream in;
+    protected ObjectOutputStream out;
     protected BlockingQueue<Signalable> signalQueue;
     /***
      * 再接続できた場合このコンテナに残っているものは再送される。
@@ -53,12 +55,9 @@ public class SocketConnection implements Connection {
      * Signalの送信に失敗した場合呼ばれるHookのコンテナ。
      ***/
     protected List<BiConsumer<SocketConnection, Signalable>> failedSendHooks = new ArrayList<>();
-
+    // ------------- channel -------------
     protected Map<String, Channel> channels = new HashMap<>();
     protected List<SignalListener> listeners = new ArrayList<>();
-
-    protected ObjectInputStream in;
-    protected ObjectOutputStream out;
 
     public SocketConnection(Socket socket, int signalCapacity) throws IOException {
         outer = this;
@@ -119,12 +118,12 @@ public class SocketConnection implements Connection {
         return serverInfo.name;
     }
 
-    public void setSerializeValidationLayer(boolean serializeValidationLayer) {
-        this.serializeValidationLayer = serializeValidationLayer;
-    }
-
     public boolean isSerializeValidationLayer() {
         return serializeValidationLayer;
+    }
+
+    public void setSerializeValidationLayer(boolean serializeValidationLayer) {
+        this.serializeValidationLayer = serializeValidationLayer;
     }
 
     @Override

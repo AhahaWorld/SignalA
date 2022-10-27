@@ -2,7 +2,7 @@ package info.ahaha.signala;
 
 import java.io.Serializable;
 
-public class ChannelSignal extends Signal{
+public class ChannelSignal extends Signal {
     protected transient Channel channel;
     protected String channelName;
 
@@ -16,6 +16,11 @@ public class ChannelSignal extends Signal{
         return channel;
     }
 
+    public void setChannel(Channel channel) {
+        this.channel = channel;
+        this.channelName = channel.name();
+    }
+
     public String getChannelName() {
         return channelName;
     }
@@ -24,10 +29,5 @@ public class ChannelSignal extends Signal{
     public void attach(Connection connection) {
         super.attach(connection);
         channel = connection.getChannel(channelName);
-    }
-
-    public void setChannel(Channel channel) {
-        this.channel = channel;
-        this.channelName = channel.name();
     }
 }

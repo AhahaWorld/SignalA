@@ -9,7 +9,7 @@ public class Rout {
     public ServerInfo source, destination;
     public Stack<ServerInfo> pass = new Stack<>();
 
-    public void send(Signalable signalable){
+    public void send(Signalable signalable) {
         SignalAPI.getConnectionManagerInstance()
                 .getConnection(pass.pop())
                 .sendSignal(new RoutingSignal(this, signalable));

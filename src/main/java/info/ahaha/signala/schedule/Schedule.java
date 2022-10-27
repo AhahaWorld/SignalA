@@ -3,10 +3,10 @@ package info.ahaha.signala.schedule;
 import java.util.function.Consumer;
 
 public class Schedule {
-    protected boolean executed = false, canceled = false;
-    protected Runnable runnable;
     protected final long estimatedExecutionEpoch;
     protected final Consumer<Schedule> canceler;
+    protected boolean executed = false, canceled = false;
+    protected Runnable runnable;
 
     public Schedule(Runnable runnable, long estimatedExecutionEpoch, Consumer<Schedule> canceler) {
         this.runnable = runnable;
@@ -14,14 +14,14 @@ public class Schedule {
         this.canceler = canceler;
     }
 
-    public void execute(){
-        if(canceled)
+    public void execute() {
+        if (canceled)
             return;
         runnable.run();
         executed = true;
     }
 
-    public boolean isExecutable(){
+    public boolean isExecutable() {
         return !executed && !canceled;
     }
 
@@ -37,12 +37,12 @@ public class Schedule {
         return runnable;
     }
 
-    public long getEstimatedExecutionEpoch() {
-        return estimatedExecutionEpoch;
-    }
-
     public void setRunnable(Runnable runnable) {
         this.runnable = runnable;
+    }
+
+    public long getEstimatedExecutionEpoch() {
+        return estimatedExecutionEpoch;
     }
 
     public void cancel() {
