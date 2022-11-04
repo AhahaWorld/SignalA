@@ -45,7 +45,7 @@ public class VirtualConnect implements Connection {
     }
 
     @Override
-    public ConnectionState getConnectionInfo() {
+    public ConnectionState getConnectionState() {
         return ConnectionState.VIRTUAL;
     }
 

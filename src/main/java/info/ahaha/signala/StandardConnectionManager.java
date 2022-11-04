@@ -1,20 +1,41 @@
 package info.ahaha.signala;
 
+import info.ahaha.signala.metasignal.ConnectionInfo;
+import info.ahaha.signala.metasignal.MetaSignal;
+import info.ahaha.signala.metasignal.RemoveConnectionInfo;
 import info.ahaha.signala.metasignal.ServerInfo;
 
 import java.io.IOException;
 import java.net.Socket;
+import java.nio.channels.NotYetConnectedException;
 import java.util.ArrayList;
 import java.util.List;
 
 public class StandardConnectionManager implements ConnectionManager {
     public static int SIGNAL_CAPACITY = 100;
 
-    List<Connection> connections = new ArrayList<>();
+    protected List<Connection> connections = new ArrayList<>();
+
+    @Override
+    public void close() {
+        for (Connection connection : connections)
+            removeConnection(connection);
+    }
+
+    @Override
+    public boolean contains(Connection connection) {
+        if (connections.contains(connection)) return true;
+        for (Connection had : connections) {
+            if (had.getServerInfo() == ServerInfo.NOT_YET_KNOWN)
+                throw new NotYetConnectedException();
+            if (had.getServerInfo().name == connection.getServerInfo().name)
+                return true;
+        }
+        return false;
+    }
 
     @Override
     public void refresh() {
-
     }
 
     @Override
@@ -28,13 +49,32 @@ public class StandardConnectionManager implements ConnectionManager {
     }
 
     @Override
-    public Connection getConnection(String host, int port) {
+    public List<Connection> getConnections() {
+        return connections;
+    }
+
+    @Override
+    public Connection getConnection(String name, int port) {
+        for (Connection connection : connections)
+            if (connection.getServerInfo().name.equals(name) && connection.getServerInfo().port == port)
+                return connection;
         return null;
     }
 
     @Override
     public Connection getConnection(ServerInfo info) {
+        for (Connection connection : connections)
+            if (connection.getServerInfo().equals(info))
+                return connection;
         return null;
+    }
+
+    @Override
+    public Connection addConnection(Connection connection) {
+        if (contains(connection))
+            return null;
+        connections.add(connection);
+        return connection;
     }
 
     @Override
@@ -75,11 +115,46 @@ public class StandardConnectionManager implements ConnectionManager {
 
     @Override
     public void removeConnection(Connection connection) {
-
+        connection.sendSignal(MetaSignal.DISCONNECT_SERVER.toSignalWithData(new RemoveConnectionInfo(new ConnectionInfo(connection), "close by that side", ServerPositionSide.THAT)));
+        Runnable r = () -> {
+            connection.close();
+            connection.call(new Signal("ConnectionRemoveByNormal", new RemoveConnectionInfo(new ConnectionInfo(connection), "close by this side", ServerPositionSide.THIS)));
+            connections.remove(connection);
+        };
+        if (connection instanceof SocketConnection)
+            SignalAPI.getSchedulerInstance().scheduling(r, 10);
+        else
+            r.run();
     }
 
     @Override
-    public void removeConnectionByAbnormal(Connection connection) {
+    public void removeConnection(Connection connection, String why) {
+        connection.sendSignal(MetaSignal.DISCONNECT_SERVER.toSignalWithData(new RemoveConnectionInfo(new ConnectionInfo(connection), why, ServerPositionSide.THAT)));
+        Runnable r = () -> {
+            connection.close();
+            connection.call(new Signal("ConnectionRemoveByNormal", new RemoveConnectionInfo(new ConnectionInfo(connection), why, ServerPositionSide.THIS)));
+            connections.remove(connection);
+        };
+        if (connection instanceof SocketConnection)
+            SignalAPI.getSchedulerInstance().scheduling(r, 10);
+        else
+            r.run();
+    }
 
+    @Override
+    public void removeConnectionByAbnormal(Connection connection, String why, ServerPositionSide side) {
+        connection.close();
+        connection.call(new Signal("ConnectionRemoveByNormal", new RemoveConnectionInfo(new ConnectionInfo(connection), "close by this side", side)));
+        connections.remove(connection);
+    }
+
+    @Override
+    public void removeConnectionByAbnormal(RemoveConnectionInfo removeConnectionInfo) {
+        Connection connection = getConnection(removeConnectionInfo.connectionInfo.serverInfo);
+        if (connection == null)
+            return;
+        connection.close();
+        connection.call(new Signal("ConnectionRemoveByNormal", removeConnectionInfo));
+        connections.remove(connection);
     }
 }

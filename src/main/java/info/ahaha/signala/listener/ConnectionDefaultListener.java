@@ -28,7 +28,7 @@ public class ConnectionDefaultListener implements SignalListener {
                     signal.getConnection().sendSignal(metaSignal.request.createResponse(SignalAPI.getInstance().getServerInfo()));
                     break;
                 }
-                case REMOVE_SERVER: {
+                case DISCONNECT_SERVER: {
                     SignalAPI.getConnectionManagerInstance().removeConnection(signal.getConnection());
                     break;
                 }

@@ -8,7 +8,7 @@ import java.util.List;
 
 public class ConnectionsVerificationData implements Serializable {
     public final int size;
-    public final List<ConnectionData> infos;
+    public final List<ConnectionInfo> infos;
 
     public ConnectionsVerificationData(List<Connection> connections) {
         size = connections.size();
@@ -16,7 +16,7 @@ public class ConnectionsVerificationData implements Serializable {
         for (Connection connection : connections) {
             if (connection.getServerInfo() == ServerInfo.NOT_YET_KNOWN)
                 continue;
-            infos.add(new ConnectionData(connection.getServerInfo(), connection.getConnectionInfo()));
+            infos.add(new ConnectionInfo(connection.getServerInfo(), connection.getConnectionState()));
         }
     }
 }

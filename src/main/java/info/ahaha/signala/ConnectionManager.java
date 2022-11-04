@@ -1,19 +1,29 @@
 package info.ahaha.signala;
 
+import info.ahaha.signala.metasignal.RemoveConnectionInfo;
 import info.ahaha.signala.metasignal.ServerInfo;
 
 import java.net.Socket;
+import java.util.List;
 
 public interface ConnectionManager {
+    void close();
+
+    boolean contains(Connection connection);
+
     void refresh();
 
     Rout rooting(ServerInfo target);
 
     boolean checkRoot(Rout rout);
 
-    Connection getConnection(String host, int port);
+    List<Connection> getConnections();
+
+    Connection getConnection(String name, int port);
 
     Connection getConnection(ServerInfo info);
+
+    public Connection addConnection(Connection connection);
 
     Connection addConnection(String host, int port);
 
@@ -23,5 +33,9 @@ public interface ConnectionManager {
 
     void removeConnection(Connection connection);
 
-    void removeConnectionByAbnormal(Connection connection);
+    void removeConnection(Connection connection, String ehy);
+
+    void removeConnectionByAbnormal(Connection connection, String why, ServerPositionSide side);
+
+    void removeConnectionByAbnormal(RemoveConnectionInfo removeConnectionInfo);
 }

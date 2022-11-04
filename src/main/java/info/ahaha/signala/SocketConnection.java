@@ -132,7 +132,7 @@ public class SocketConnection implements Connection {
     }
 
     @Override
-    public ConnectionState getConnectionInfo() {
+    public ConnectionState getConnectionState() {
         return connectionState;
     }
 
@@ -253,7 +253,7 @@ public class SocketConnection implements Connection {
             } catch (IOException ex) {
                 SignalAPI.getInstance().assistLogging(ex);
                 if (counter <= 0) {
-                    SignalAPI.getConnectionManagerInstance().removeConnectionByAbnormal(this);
+                    SignalAPI.getConnectionManagerInstance().removeConnectionByAbnormal(this, "lost connection (in)", ServerPositionSide.THAT);
                     return;
                 }
                 SignalAPI.getInstance().getScheduler().schedulingAsync(getInWorkerReconstruction(counter - 1), SERVER_IO_THREAD_CONSTRUCTION_INTERVAL_MILLI_SEC);
@@ -272,7 +272,7 @@ public class SocketConnection implements Connection {
                 out = new ObjectOutputStream(socket.getOutputStream());
             } catch (IOException ex) {
                 if (counter <= 0) {
-                    SignalAPI.getConnectionManagerInstance().removeConnectionByAbnormal(this);
+                    SignalAPI.getConnectionManagerInstance().removeConnectionByAbnormal(this, "lost connection (out)", ServerPositionSide.THAT);
                     return;
                 }
                 SignalAPI.getInstance().getScheduler().schedulingAsync(getInWorkerReconstruction(counter - 1), SERVER_IO_THREAD_CONSTRUCTION_INTERVAL_MILLI_SEC);

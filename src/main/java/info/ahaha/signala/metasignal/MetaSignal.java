@@ -8,8 +8,8 @@ import java.io.Serializable;
 public enum MetaSignal implements Serializable {
     SUCCESS, ONE_MORE,
     GET_SERVER_INFO,
-    CONNECT_SERVER /*WithData Type : ServerInfo*/,
-    REMOVE_SERVER,
+    CONNECT_SERVER ,   /*WithData Type : ServerInfo*/
+    DISCONNECT_SERVER, /*WithData Type : RemoveConnectionInfo*/
     CONNECTIONS_VERIFY /*WithData Type : ConnectionsVerificationData*/;
 
     public Signalable toSignal() {
