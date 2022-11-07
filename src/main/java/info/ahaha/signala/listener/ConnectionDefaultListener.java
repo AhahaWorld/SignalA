@@ -59,6 +59,9 @@ public class ConnectionDefaultListener implements SignalListener {
                         for (ServerInfo hasReceiver : hasReceivers)
                             if (hasSender.id.equals(hasReceiver.id)) {
                                 found = true;
+                                if (hasReceiver.timestamp < hasSender.timestamp)
+                                    SignalAPI.getInstance().getConnectionManager()
+                                            .getConnection(hasReceiver).updateServerInfo(hasSender);
                                 break;
                             }
                         if (found)

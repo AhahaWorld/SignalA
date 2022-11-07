@@ -1,6 +1,7 @@
 package info.ahaha.signala.metasignal;
 
 import java.io.Serializable;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -13,6 +14,7 @@ public class ServerInfo implements Serializable {
     public final List<Feature> features;
 
     public final UUID id;
+    public final long timestamp;
 
     public ServerInfo(String host, int port, String name, List<Feature> features, UUID id) {
         this.host = host;
@@ -20,5 +22,6 @@ public class ServerInfo implements Serializable {
         this.port = port;
         this.features = features;
         this.id = id;
+        this.timestamp = Instant.now().getEpochSecond();
     }
 }

@@ -132,6 +132,11 @@ public class SocketConnection implements Connection {
     }
 
     @Override
+    public void updateServerInfo(ServerInfo newInfo) {
+        serverInfo = newInfo;
+    }
+
+    @Override
     public ConnectionState getConnectionState() {
         return connectionState;
     }

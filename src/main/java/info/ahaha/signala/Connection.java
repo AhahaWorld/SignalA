@@ -15,6 +15,8 @@ public interface Connection extends SignalRegister {
 
     ServerInfo getServerInfo();
 
+    void updateServerInfo(ServerInfo newInfo);
+
     ConnectionState getConnectionState();
 
     void close();
