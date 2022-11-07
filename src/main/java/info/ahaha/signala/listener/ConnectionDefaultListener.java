@@ -97,15 +97,6 @@ public class ConnectionDefaultListener implements SignalListener {
                     serverInfoSetter.set((ServerInfo) metaRes.response);
                     break;
                 }
-                case CONNECT_SERVER: {
-                    if (metaRes.response == null)
-                        break;
-                    if (!(metaRes.response instanceof MetaSignal))
-                        break;
-                    if (metaRes.response != MetaSignal.SUCCESS)
-                        signal.getConnection().sendSignal(MetaSignal.CONNECT_SERVER.toSignal());
-                    break;
-                }
             }
         }
     }

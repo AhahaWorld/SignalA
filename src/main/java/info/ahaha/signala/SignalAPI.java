@@ -1,6 +1,8 @@
 package info.ahaha.signala;
 
+import info.ahaha.signala.metasignal.ConnectionsVerificationData;
 import info.ahaha.signala.metasignal.Feature;
+import info.ahaha.signala.metasignal.MetaSignal;
 import info.ahaha.signala.metasignal.ServerInfo;
 import info.ahaha.signala.schedule.Scheduler;
 
@@ -55,4 +57,21 @@ public interface SignalAPI {
     boolean haveFeature(String featureName);
 
     void addFeature(Feature feature);
+
+    default boolean requestSendMetaSignal(Connection connection, MetaSignal signal) {
+        switch (signal) {
+            case GET_SERVER_INFO:
+                connection.sendSignal(signal.toSignal());
+                break;
+            case DISCONNECT_SERVER:
+                getConnectionManager().removeConnection(connection);
+                break;
+            case CONNECTIONS_VERIFY:
+                connection.sendSignal(signal.toSignalWithData(new ConnectionsVerificationData(getConnections())));
+                break;
+            default:
+                return false;
+        }
+        return true;
+    }
 }
