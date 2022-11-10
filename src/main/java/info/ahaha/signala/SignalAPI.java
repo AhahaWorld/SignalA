@@ -32,6 +32,8 @@ public interface SignalAPI {
 
     ServerInfo getServerInfo();
 
+    void updateServerInfo(ServerInfo newInfo);
+
     UUID getServerID();
 
     void logging(String... msg);

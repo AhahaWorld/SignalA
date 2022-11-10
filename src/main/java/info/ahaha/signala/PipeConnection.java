@@ -50,6 +50,11 @@ public class PipeConnection implements Connection {
     }
 
     @Override
+    public void updateServerInfo(ServerInfo newInfo) {
+        SignalAPI.getInstance().updateServerInfo(newInfo);
+    }
+
+    @Override
     public ConnectionState getConnectionState() {
         return ConnectionState.NORMAL;
     }

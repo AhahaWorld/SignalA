@@ -45,6 +45,11 @@ public class VirtualConnect implements Connection {
     }
 
     @Override
+    public void updateServerInfo(ServerInfo newInfo) {
+        serverInfo = newInfo;
+    }
+
+    @Override
     public ConnectionState getConnectionState() {
         return ConnectionState.VIRTUAL;
     }

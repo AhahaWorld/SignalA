@@ -5,6 +5,7 @@ import info.ahaha.signala.metasignal.ServerInfo;
 
 import java.net.Socket;
 import java.util.List;
+import java.util.function.Consumer;
 
 public interface ConnectionManager {
     void close();
@@ -38,4 +39,12 @@ public interface ConnectionManager {
     void removeConnectionByAbnormal(Connection connection, String why, ServerPositionSide side);
 
     void removeConnectionByAbnormal(RemoveConnectionInfo removeConnectionInfo);
+
+    void registerAddConnectionHooK(Consumer<Connection> connectionConsumer);
+
+    void registerRemoveConnectionHooK(Consumer<Connection> connectionConsumer);
+
+    void unregisterAddConnectionHooK(Consumer<Connection> connectionConsumer);
+
+    void unregisterRemoveConnectionHooK(Consumer<Connection> connectionConsumer);
 }
